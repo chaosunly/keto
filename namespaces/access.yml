@@ -1,0 +1,10 @@
+class: role
+relations:
+  members: user
+permissions:
+  manage_users:
+    expr: members
+
+class: user
+relations:
+  role: role
