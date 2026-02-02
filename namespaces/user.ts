@@ -1,3 +1,3 @@
 import { Namespace } from "@ory/keto-namespace-types"
 
-class User implements Namespace {}
+export class User implements Namespace {}
