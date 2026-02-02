@@ -1,3 +1,3 @@
-namespace user implements Namespace {
-  relation role: role
-}
+import { Namespace } from "@ory/keto-namespace-types"
+
+class User implements Namespace {}
