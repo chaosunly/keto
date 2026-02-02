@@ -1,3 +1,3 @@
-namespace user {
+namespace user implements Namespace {
   relation role: role
 }
