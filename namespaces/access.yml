@@ -1,8 +1,8 @@
-class role {
+namespace role {
   relation members: user
   permission manage_users = members
 }
 
-class user {
+namespace user {
   relation role: role
 }
