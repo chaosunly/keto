@@ -1,10 +1,8 @@
-class: role
-relations:
-  members: user
-permissions:
-  manage_users:
-    expr: members
+class role {
+  relation members: user
+  permission manage_users = members
+}
 
-class: user
-relations:
-  role: role
+class user {
+  relation role: role
+}
