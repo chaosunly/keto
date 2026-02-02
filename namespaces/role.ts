@@ -1,12 +1,14 @@
-import { Namespace, Context } from "@ory/keto-namespace-types"
+import { Namespace } from "@ory/keto-namespace-types";
 
-class Role implements Namespace {
+export class User implements Namespace {}
+
+export class Role implements Namespace {
   related: {
-    members: User[]
-  }
+    members: User[];
+  };
 
   permits = {
-    manage_users: (ctx: Context): boolean =>
-      this.related.members.includes(ctx.subject),
-  }
+    members: this.related.members,
+    manage_users: this.related.members,
+  };
 }
