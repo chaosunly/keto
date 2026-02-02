@@ -1,4 +1,4 @@
-dsn: ${DATABASE_URL}
+dsn: ${DSN}
 
 serve:
   read:
