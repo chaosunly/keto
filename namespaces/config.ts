@@ -41,50 +41,56 @@ export class Organization implements Namespace {
     global_admins: GlobalRole[];
   };
 
-  private isGlobalAdmin(ctx: Context): boolean {
-    // If you create a single object like GlobalRole:admin
-    // and add global admins to it, you can reference it here.
-    return this.related.global_admins.traverse((r) => r.permits.is_admin(ctx));
-  }
-
-  private isOrgAdmin(ctx: Context): boolean {
-    return (
-      this.related.owners.includes(ctx.subject) ||
-      this.related.admins.includes(ctx.subject) ||
-      this.isGlobalAdmin(ctx)
-    );
-  }
-
-  private anyRoleMember(ctx: Context, roles: Role[]): boolean {
-    return roles.traverse((r) => r.permits.has(ctx));
-  }
-
   permits = {
     is_member: (ctx: Context) =>
-      this.related.members.includes(ctx.subject) || this.isOrgAdmin(ctx),
+      this.related.members.includes(ctx.subject) ||
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)),
 
     // Full admins OR custom roles with that permission
     manage_org: (ctx: Context) =>
-      this.isOrgAdmin(ctx) || this.anyRoleMember(ctx, this.related.manage_org_roles),
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_org_roles.traverse((r) => r.permits.has(ctx)),
 
     manage_users: (ctx: Context) =>
-      this.isOrgAdmin(ctx) || this.anyRoleMember(ctx, this.related.manage_users_roles),
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_users_roles.traverse((r) => r.permits.has(ctx)),
 
     manage_groups: (ctx: Context) =>
-      this.isOrgAdmin(ctx) || this.anyRoleMember(ctx, this.related.manage_groups_roles),
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_groups_roles.traverse((r) => r.permits.has(ctx)),
 
     manage_roles: (ctx: Context) =>
-      this.isOrgAdmin(ctx) || this.anyRoleMember(ctx, this.related.manage_roles_roles),
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_roles_roles.traverse((r) => r.permits.has(ctx)),
 
     // convenience (optional)
     create_group: (ctx: Context) =>
-      this.isOrgAdmin(ctx) || this.anyRoleMember(ctx, this.related.manage_groups_roles),
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_groups_roles.traverse((r) => r.permits.has(ctx)),
 
     create_role: (ctx: Context) =>
-      this.isOrgAdmin(ctx) || this.anyRoleMember(ctx, this.related.manage_roles_roles),
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_roles_roles.traverse((r) => r.permits.has(ctx)),
 
     assign_role: (ctx: Context) =>
-      this.isOrgAdmin(ctx) || this.anyRoleMember(ctx, this.related.manage_roles_roles),
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_roles_roles.traverse((r) => r.permits.has(ctx)),
   };
 }
 
@@ -99,14 +105,13 @@ export class Group implements Namespace {
     managers: User[]; // optional group-level managers
   };
 
-  private orgAllows(ctx: Context, perm: keyof Organization["permits"]): boolean {
-    return this.related.org.traverse((o) => o.permits[perm](ctx));
-  }
-
   permits = {
-    view: (ctx: Context) => this.orgAllows(ctx, "is_member"),
+    view: (ctx: Context) => 
+      this.related.org.traverse((o) => o.permits.is_member(ctx)),
+    
     manage: (ctx: Context) =>
-      this.orgAllows(ctx, "manage_groups") || this.related.managers.includes(ctx.subject),
+      this.related.org.traverse((o) => o.permits.manage_groups(ctx)) ||
+      this.related.managers.includes(ctx.subject),
   };
 }
 
@@ -121,14 +126,13 @@ export class Role implements Namespace {
   };
 
   private orgAllows(ctx: Context, perm: keyof Organization["permits"]): boolean {
-    return this.related.org.traverse((o) => o.permits[perm](ctx));
-  }
-
-  permits = {
+   ermits = {
     // who is in this role
     has: (ctx: Context) => this.related.members.includes(ctx.subject),
 
     // who can assign/remove members from this role
-    manage_members: (ctx: Context) => this.orgAllows(ctx, "manage_roles"),
+    manage_members: (ctx: Context) => 
+      this.related.org.traverse((o) => o.permits.manage_roles(ctx)),
+      }
   };
 }
