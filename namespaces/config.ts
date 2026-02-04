@@ -125,14 +125,12 @@ export class Role implements Namespace {
     members: User[];
   };
 
-  private orgAllows(ctx: Context, perm: keyof Organization["permits"]): boolean {
-   ermits = {
+  permits = {
     // who is in this role
     has: (ctx: Context) => this.related.members.includes(ctx.subject),
 
     // who can assign/remove members from this role
     manage_members: (ctx: Context) => 
       this.related.org.traverse((o) => o.permits.manage_roles(ctx)),
-      }
   };
 }
