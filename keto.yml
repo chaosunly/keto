@@ -2,11 +2,9 @@ dsn: ${DSN}
 
 serve:
   read:
-    base_url: https://${{RAILWAY_PUBLIC_DOMAIN}}
     host: 0.0.0.0
     port: 4466
   write:
-    base_url: https://${{RAILWAY_PUBLIC_DOMAIN}}
     host: 0.0.0.0
     port: 4467
 
