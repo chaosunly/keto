@@ -25,17 +25,17 @@ export class GlobalRole implements Namespace {
  */
 export class Organization implements Namespace {
   related: {
-    owners: User[];   // highest within org
-    admins: User[];   // org admins
-    members: User[];  // normal members
+    owners: User[]; // highest within org
+    admins: User[]; // org admins
+    members: User[]; // normal members
 
-    groups: Group[];  // groups belonging to this org
+    groups: Group[]; // groups belonging to this org
     roles: Role[];
-    
+
     manage_users_roles: Role[];
     manage_groups_roles: Role[];
     manage_roles_roles: Role[];
-    manage_org_roles: Role[];// roles belonging to this org
+    manage_org_roles: Role[]; // roles belonging to this org
 
     // (Optional) allow global admin to manage every org
     global_admins: GlobalRole[];
@@ -106,9 +106,9 @@ export class Group implements Namespace {
   };
 
   permits = {
-    view: (ctx: Context) => 
+    view: (ctx: Context) =>
       this.related.org.traverse((o) => o.permits.is_member(ctx)),
-    
+
     manage: (ctx: Context) =>
       this.related.org.traverse((o) => o.permits.manage_groups(ctx)) ||
       this.related.managers.includes(ctx.subject),
@@ -130,7 +130,7 @@ export class Role implements Namespace {
     has: (ctx: Context) => this.related.members.includes(ctx.subject),
 
     // who can assign/remove members from this role
-    manage_members: (ctx: Context) => 
+    manage_members: (ctx: Context) =>
       this.related.org.traverse((o) => o.permits.manage_roles(ctx)),
   };
 }
