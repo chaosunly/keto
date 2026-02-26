@@ -91,6 +91,23 @@ export class Organization implements Namespace {
       this.related.admins.includes(ctx.subject) ||
       this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
       this.related.manage_roles_roles.traverse((r) => r.permits.has(ctx)),
+
+    // ADD: remove_member permission
+    remove_member: (ctx: Context) =>
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_users_roles.traverse((r) => r.permits.has(ctx)),
+
+    // ADD: invite_member permission (if different from manage_users)
+    invite_member: (ctx: Context) =>
+      this.related.owners.includes(ctx.subject) ||
+      this.related.admins.includes(ctx.subject) ||
+      this.related.global_admins.traverse((r) => r.permits.is_admin(ctx)) ||
+      this.related.manage_users_roles.traverse((r) => r.permits.has(ctx)),
+
+    // ADD: view organization details
+    view: (ctx: Context) => this.permits.is_member(ctx),
   };
 }
 
@@ -103,6 +120,8 @@ export class Group implements Namespace {
     org: Organization[];
     members: User[];
     managers: User[]; // optional group-level managers
+    // ADD: roles that can manage this specific group
+    manage_roles: Role[];
   };
 
   permits = {
@@ -111,7 +130,17 @@ export class Group implements Namespace {
 
     manage: (ctx: Context) =>
       this.related.org.traverse((o) => o.permits.manage_groups(ctx)) ||
-      this.related.managers.includes(ctx.subject),
+      this.related.managers.includes(ctx.subject) ||
+      this.related.manage_roles.traverse((r) => r.permits.has(ctx)),
+
+    // ADD: add_member to group
+    add_member: (ctx: Context) => this.permits.manage(ctx),
+
+    // ADD: remove_member from group
+    remove_member: (ctx: Context) => this.permits.manage(ctx),
+
+    // ADD: is_member check
+    is_member: (ctx: Context) => this.related.members.includes(ctx.subject),
   };
 }
 
@@ -123,14 +152,26 @@ export class Role implements Namespace {
   related: {
     org: Organization[];
     members: User[];
+    // ADD: groups that have this role
+    groups: Group[];
   };
 
   permits = {
     // who is in this role
-    has: (ctx: Context) => this.related.members.includes(ctx.subject),
+    has: (ctx: Context) =>
+      this.related.members.includes(ctx.subject) ||
+      this.related.groups.traverse((g) => g.permits.is_member(ctx)),
 
     // who can assign/remove members from this role
     manage_members: (ctx: Context) =>
+      this.related.org.traverse((o) => o.permits.manage_roles(ctx)),
+
+    // ADD: view role details
+    view: (ctx: Context) =>
+      this.related.org.traverse((o) => o.permits.is_member(ctx)),
+
+    // ADD: delete role
+    delete: (ctx: Context) =>
       this.related.org.traverse((o) => o.permits.manage_roles(ctx)),
   };
 }
