@@ -1,6 +1,7 @@
 import { Namespace, Context } from "@ory/keto-namespace-types";
 import { RoleBinding } from "./roleBinding";
 import { GitlabGroup } from "./gitlabGroup";
+import { User } from "./user";
 
 /**
  * GitlabProject mirrors GitLab's project concept — a single repository with
@@ -58,6 +59,13 @@ export class GitlabProject implements Namespace {
     reporter_bindings: RoleBinding[];
     guest_bindings: RoleBinding[];
 
+    // Legacy direct role assignments (used by iam-app service layer)
+    owner: User[];
+    maintainer: User[];
+    developer: User[];
+    reporter: User[];
+    guest: User[];
+
     // ── Hierarchy ──────────────────────────────────────────────────────
     /**
      * The group this project belongs to. Users with any role in the parent
@@ -66,6 +74,8 @@ export class GitlabProject implements Namespace {
      * Keto tuple: GitlabProject:payment-api#parent_group@GitlabGroup:backend-team
      */
     parent_group: GitlabGroup[];
+    // Legacy alias stored as a raw subject_id by the current app service layer.
+    parent: User[];
   };
 
   permits = {
@@ -81,26 +91,31 @@ export class GitlabProject implements Namespace {
 
     is_owner: (ctx: Context) =>
       this.related.owner_bindings.traverse((b) => b.permits.bound(ctx)) ||
+      this.related.owner.includes(ctx.subject) ||
       this.permits.is_admin(ctx) ||
       this.related.parent_group.traverse((g) => g.permits.is_owner(ctx)),
 
     is_maintainer: (ctx: Context) =>
       this.related.maintainer_bindings.traverse((b) => b.permits.bound(ctx)) ||
+      this.related.maintainer.includes(ctx.subject) ||
       this.permits.is_owner(ctx) ||
       this.related.parent_group.traverse((g) => g.permits.is_maintainer(ctx)),
 
     is_developer: (ctx: Context) =>
       this.related.developer_bindings.traverse((b) => b.permits.bound(ctx)) ||
+      this.related.developer.includes(ctx.subject) ||
       this.permits.is_maintainer(ctx) ||
       this.related.parent_group.traverse((g) => g.permits.is_developer(ctx)),
 
     is_reporter: (ctx: Context) =>
       this.related.reporter_bindings.traverse((b) => b.permits.bound(ctx)) ||
+      this.related.reporter.includes(ctx.subject) ||
       this.permits.is_developer(ctx) ||
       this.related.parent_group.traverse((g) => g.permits.is_reporter(ctx)),
 
     is_guest: (ctx: Context) =>
       this.related.guest_bindings.traverse((b) => b.permits.bound(ctx)) ||
+      this.related.guest.includes(ctx.subject) ||
       this.permits.is_reporter(ctx) ||
       this.related.parent_group.traverse((g) => g.permits.is_guest(ctx)),
 
@@ -159,8 +174,8 @@ export class GitlabProject implements Namespace {
 
     // Owner (50) ──────────────────────────────────────────────────────
 
-    /** Owners can add, remove, or change the role of project members. */
-    manage_members: (ctx: Context) => this.permits.is_owner(ctx),
+    /** Maintainers+ can add, remove, or change the role of project members. */
+    manage_members: (ctx: Context) => this.permits.is_maintainer(ctx),
 
     /** Owners can archive or permanently delete the project. */
     delete_project: (ctx: Context) => this.permits.is_owner(ctx),
@@ -179,5 +194,12 @@ export class GitlabProject implements Namespace {
      * system-wide, bypass merge approvals).
      */
     admin_override: (ctx: Context) => this.permits.is_admin(ctx),
+
+    // Legacy aliases to match iam-app permission checks.
+    merge: (ctx: Context) => this.permits.create_merge_request(ctx),
+    deploy: (ctx: Context) => this.permits.manage_pipelines(ctx),
+    delete: (ctx: Context) => this.permits.delete_project(ctx),
+    edit_settings: (ctx: Context) => this.permits.manage_settings(ctx),
+    read_issues: (ctx: Context) => this.permits.view(ctx),
   };
 }

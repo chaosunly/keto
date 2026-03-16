@@ -1,4 +1,5 @@
 import { Namespace } from "@ory/keto-namespace-types";
+import { User } from "./user";
 
 /**
  * Represents a named access level in the GitLab-style permission model.
@@ -21,4 +22,9 @@ import { Namespace } from "@ory/keto-namespace-types";
  * The `role` relation on RoleBinding references these instances as a
  * queryable metadata tag (e.g. "list all developer bindings on project X").
  */
-export class Role implements Namespace {}
+export class Role implements Namespace {
+  related: {
+    /** Compatibility relation used by app group-role assignment. */
+    groups: User[];
+  };
+}
