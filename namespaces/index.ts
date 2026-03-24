@@ -14,3 +14,6 @@ export { Role } from "./role";
 export { RoleBinding } from "./roleBinding";
 export { GitlabGroup } from "./gitlabGroup";
 export { GitlabProject } from "./gitlabProject";
+export { MatrixOrg } from "./matrixOrg";
+export { MatrixSpace } from "./matrixSpace";
+export { MatrixRoom } from "./matrixRoom";

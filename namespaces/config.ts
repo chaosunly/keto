@@ -1,3 +1,8 @@
+/**
+ * @deprecated config.ts is a legacy flat monolith kept for reference only.
+ * The active Keto entrypoint is index.ts (see keto.yml: namespaces.location).
+ * Add new namespaces as individual files and export them from index.ts.
+ */
 import { Namespace, Context } from "@ory/keto-namespace-types";
 
 /** Represents an individual platform user (identity from Ory Kratos). */

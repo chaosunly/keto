@@ -10,6 +10,8 @@ Ory Keto provides fine-grained access control through relationship-based permiss
 - **Organization**: Multi-tenant support with hierarchical permissions
 - **Group**: User groups within organizations
 - **Role**: Custom roles with granular permissions
+- **GitLab**: Project/group access control mirroring GitLab's access levels
+- **Matrix**: Element Matrix homeserver access management (Org → Space → Room hierarchy)
 
 ## Quick Links
 
@@ -21,8 +23,31 @@ Ory Keto provides fine-grained access control through relationship-based permiss
 
 ## Configuration Files
 
-- [`keto.yml`](./keto.yml) - Main Keto configuration
-- [`namespaces/config.ts`](./namespaces/config.ts) - Permission model definitions
+- [`keto.yml`](./keto.yml) - Main Keto configuration (namespace entrypoint: `namespaces/index.ts`)
+- [`namespaces/index.ts`](./namespaces/index.ts) - Active namespace entrypoint loaded by Keto
+- [`namespaces/config.ts`](./namespaces/config.ts) - **Deprecated** flat monolith kept for reference; do not add new namespaces here
+
+### Adding a new namespace
+
+1. Create `namespaces/<name>.ts` following the existing file patterns (see `gitlabGroup.ts` for a documented example)
+2. Export the class from `namespaces/index.ts`
+3. Redeploy — Keto picks up the change on restart
+
+## Namespace Files
+
+| File | Classes | Description |
+| --- | --- | --- |
+| `user.ts` | `User` | Leaf subject — Ory Kratos identity |
+| `globalRole.ts` | `GlobalRole` | Platform-wide super-admin |
+| `organization.ts` | `Organization`, `OrgGroup`, `OrgRole` | Multi-tenant org with delegated roles |
+| `group.ts` | `Group` | Legacy IAM app group (service-layer compat) |
+| `role.ts` | `Role` | GitLab access-level marker |
+| `roleBinding.ts` | `RoleBinding` | Subject-to-role intermediary for GitLab namespaces |
+| `gitlabGroup.ts` | `GitlabGroup` | GitLab group with 6-level access hierarchy |
+| `gitlabProject.ts` | `GitlabProject` | GitLab project with parent group inheritance |
+| `matrixOrg.ts` | `MatrixOrg` | Matrix homeserver org (top-level) |
+| `matrixSpace.ts` | `MatrixSpace` | Matrix space with parent org inheritance |
+| `matrixRoom.ts` | `MatrixRoom` | Matrix room with parent space/org inheritance |
 
 ## Permission Model
 
@@ -41,13 +66,44 @@ Organization
       ├─ manage_roles_roles
       └─ manage_org_roles
 
-Group
-  ├─ org: Parent organization
-  └─ members: Group members
+GitLab (Admin > Owner > Maintainer > Developer > Reporter > Guest)
+  GitlabGroup
+    └─ GitlabProject (inherits via parent_group)
 
-Role
-  ├─ org: Parent organization
-  └─ members: Users with this role
+Matrix (matrix_admin > moderator/support > member > viewer)
+  MatrixOrg
+    └─ MatrixSpace  (inherits via parent → MatrixOrg)
+         └─ MatrixRoom (inherits via parent → MatrixSpace → MatrixOrg)
+```
+
+### Matrix roles
+
+| Role | manage_users | manage_roles | manage_spaces | manage_rooms | view_audit | impersonate_support | view_content |
+| --- | :---: | :---: | :---: | :---: | :---: | :---: | :---: |
+| `matrix_admin` | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ | ✓ |
+| `moderator` | (space/room scope) | — | — | (space scope) | — | — | ✓ |
+| `support` | — | — | — | — | ✓ | ✓ | ✓ |
+| `member` | — | — | — | — | — | — | ✓ |
+| `viewer` | — | — | — | — | — | — | ✓ |
+
+Roles inherit downward: `matrix_admin` passes all `is_moderator` / `is_support` checks.
+Parent resources propagate roles to child resources via the `parent` relation tuple.
+
+### Matrix relation tuple examples
+
+```
+# Grant alice matrix_admin on org "acme"
+MatrixOrg:acme#matrix_admin@alice
+
+# Link space "general" to org "acme"
+MatrixSpace:space-001#parent@MatrixOrg:acme
+
+# Link room "announcements" to space "general"
+MatrixRoom:room-001#parent@MatrixSpace:space-001
+
+# Grant carol moderator directly on space "general"
+MatrixSpace:space-001#moderator@carol
+# carol now also passes manage_rooms on any room inside space-001
 ```
 
 ## Setup
@@ -62,7 +118,7 @@ export DSN="postgresql://user:password@host:5432/keto"
 
 The Dockerfile and configuration are ready for Railway deployment. Keto will automatically:
 
-- Apply namespace configuration from `/etc/keto/namespaces`
+- Load namespace configuration from `namespaces/index.ts`
 - Run migrations on startup
 - Expose Read API on port 4466
 - Expose Write API on port 4467
@@ -105,16 +161,29 @@ curl -X POST http://keto:4466/relation-tuples/check \
   }'
 ```
 
+### Check Matrix Permission
+
+```bash
+curl -X POST http://keto:4466/relation-tuples/check \
+  -H "Content-Type: application/json" \
+  -d '{
+    "namespace": "MatrixOrg",
+    "object": "acme",
+    "relation": "manage_rooms",
+    "subject_id": "alice"
+  }'
+```
+
 ### Grant Permission
 
 ```bash
 curl -X PUT http://keto:4467/admin/relation-tuples \
   -H "Content-Type: application/json" \
   -d '{
-    "namespace": "Organization",
-    "object": "acme-corp",
-    "relation": "admins",
-    "subject_id": "user_123"
+    "namespace": "MatrixOrg",
+    "object": "acme",
+    "relation": "matrix_admin",
+    "subject_id": "alice"
   }'
 ```
 
