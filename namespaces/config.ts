@@ -1,7 +1,9 @@
 /**
- * @deprecated config.ts is a legacy flat monolith kept for reference only.
- * The active Keto entrypoint is index.ts (see keto.yml: namespaces.location).
- * Add new namespaces as individual files and export them from index.ts.
+ * Single-file namespace definition for Ory Keto.
+ *
+ * Keto's embedded TypeScript engine does not resolve cross-file imports, so all
+ * namespace classes must live in this one self-contained file.
+ * keto.yml points here: namespaces.location: file:///etc/keto/namespaces/config.ts
  */
 import { Namespace, Context } from "@ory/keto-namespace-types";
 
@@ -340,5 +342,147 @@ export class Organization implements Namespace {
       this.related.manage_users_roles.traverse((r) => r.permits.has(ctx)),
 
     view: (ctx: Context) => this.permits.is_member(ctx),
+  };
+}
+
+/** Matrix homeserver organisation — top-level Matrix resource. */
+export class MatrixOrg implements Namespace {
+  related: {
+    matrix_admin: User[];
+    moderator: User[];
+    support: User[];
+    member: User[];
+    viewer: User[];
+  };
+
+  permits = {
+    is_matrix_admin: (ctx: Context) =>
+      this.related.matrix_admin.includes(ctx.subject),
+
+    is_moderator: (ctx: Context) =>
+      this.related.moderator.includes(ctx.subject) ||
+      this.permits.is_matrix_admin(ctx),
+
+    is_support: (ctx: Context) =>
+      this.related.support.includes(ctx.subject) ||
+      this.permits.is_matrix_admin(ctx),
+
+    is_member: (ctx: Context) =>
+      this.related.member.includes(ctx.subject) ||
+      this.permits.is_moderator(ctx) ||
+      this.permits.is_support(ctx),
+
+    is_viewer: (ctx: Context) =>
+      this.related.viewer.includes(ctx.subject) ||
+      this.permits.is_member(ctx),
+
+    manage_users: (ctx: Context) => this.permits.is_matrix_admin(ctx),
+    manage_roles: (ctx: Context) => this.permits.is_matrix_admin(ctx),
+    manage_spaces: (ctx: Context) => this.permits.is_matrix_admin(ctx),
+    manage_rooms: (ctx: Context) => this.permits.is_matrix_admin(ctx),
+
+    view_audit: (ctx: Context) =>
+      this.permits.is_matrix_admin(ctx) || this.permits.is_support(ctx),
+
+    impersonate_support: (ctx: Context) => this.permits.is_support(ctx),
+    view_content: (ctx: Context) => this.permits.is_viewer(ctx),
+  };
+}
+
+/** Matrix space — a collection of rooms within a MatrixOrg. */
+export class MatrixSpace implements Namespace {
+  related: {
+    matrix_admin: User[];
+    moderator: User[];
+    support: User[];
+    member: User[];
+    viewer: User[];
+    parent: MatrixOrg[];
+  };
+
+  permits = {
+    is_matrix_admin: (ctx: Context) =>
+      this.related.matrix_admin.includes(ctx.subject) ||
+      this.related.parent.traverse((o) => o.permits.is_matrix_admin(ctx)),
+
+    is_moderator: (ctx: Context) =>
+      this.related.moderator.includes(ctx.subject) ||
+      this.permits.is_matrix_admin(ctx) ||
+      this.related.parent.traverse((o) => o.permits.is_moderator(ctx)),
+
+    is_support: (ctx: Context) =>
+      this.related.support.includes(ctx.subject) ||
+      this.permits.is_matrix_admin(ctx) ||
+      this.related.parent.traverse((o) => o.permits.is_support(ctx)),
+
+    is_member: (ctx: Context) =>
+      this.related.member.includes(ctx.subject) ||
+      this.permits.is_moderator(ctx) ||
+      this.permits.is_support(ctx) ||
+      this.related.parent.traverse((o) => o.permits.is_member(ctx)),
+
+    is_viewer: (ctx: Context) =>
+      this.related.viewer.includes(ctx.subject) ||
+      this.permits.is_member(ctx) ||
+      this.related.parent.traverse((o) => o.permits.is_viewer(ctx)),
+
+    manage_users: (ctx: Context) =>
+      this.permits.is_matrix_admin(ctx) || this.permits.is_moderator(ctx),
+
+    manage_rooms: (ctx: Context) =>
+      this.permits.is_matrix_admin(ctx) || this.permits.is_moderator(ctx),
+
+    view_audit: (ctx: Context) =>
+      this.permits.is_matrix_admin(ctx) || this.permits.is_support(ctx),
+
+    view_content: (ctx: Context) => this.permits.is_viewer(ctx),
+  };
+}
+
+/** Matrix room — an individual room within a MatrixSpace. */
+export class MatrixRoom implements Namespace {
+  related: {
+    matrix_admin: User[];
+    moderator: User[];
+    support: User[];
+    member: User[];
+    viewer: User[];
+    parent: MatrixSpace[];
+  };
+
+  permits = {
+    is_matrix_admin: (ctx: Context) =>
+      this.related.matrix_admin.includes(ctx.subject) ||
+      this.related.parent.traverse((s) => s.permits.is_matrix_admin(ctx)),
+
+    is_moderator: (ctx: Context) =>
+      this.related.moderator.includes(ctx.subject) ||
+      this.permits.is_matrix_admin(ctx) ||
+      this.related.parent.traverse((s) => s.permits.is_moderator(ctx)),
+
+    is_support: (ctx: Context) =>
+      this.related.support.includes(ctx.subject) ||
+      this.permits.is_matrix_admin(ctx) ||
+      this.related.parent.traverse((s) => s.permits.is_support(ctx)),
+
+    is_member: (ctx: Context) =>
+      this.related.member.includes(ctx.subject) ||
+      this.permits.is_moderator(ctx) ||
+      this.permits.is_support(ctx) ||
+      this.related.parent.traverse((s) => s.permits.is_member(ctx)),
+
+    is_viewer: (ctx: Context) =>
+      this.related.viewer.includes(ctx.subject) ||
+      this.permits.is_member(ctx) ||
+      this.related.parent.traverse((s) => s.permits.is_viewer(ctx)),
+
+    manage_room: (ctx: Context) =>
+      this.permits.is_matrix_admin(ctx) || this.permits.is_moderator(ctx),
+
+    view_audit: (ctx: Context) =>
+      this.permits.is_matrix_admin(ctx) ||
+      this.related.parent.traverse((s) => s.permits.view_audit(ctx)),
+
+    view_content: (ctx: Context) => this.permits.is_viewer(ctx),
   };
 }
