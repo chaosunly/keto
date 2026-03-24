@@ -1,9 +1,9 @@
 /**
- * Single-file namespace definition for Ory Keto.
+ * @reference config.ts is a self-contained flat copy of all namespace classes,
+ * kept as a human-readable reference and local-dev fallback.
  *
- * Keto's embedded TypeScript engine does not resolve cross-file imports, so all
- * namespace classes must live in this one self-contained file.
- * keto.yml points here: namespaces.location: file:///etc/keto/namespaces/config.ts
+ * Production: the Dockerfile uses esbuild to bundle index.ts into a single
+ * namespaces.ts file; keto.yml points there. Do not add cross-file imports here.
  */
 import { Namespace, Context } from "@ory/keto-namespace-types";
 
