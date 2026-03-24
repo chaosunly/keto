@@ -1,14 +1,18 @@
-# Stage 1: Bundle all namespace TypeScript files into a single file.
-# Keto's embedded TS engine cannot resolve cross-file imports, so we use
-# esbuild to flatten index.ts and all its imports into one self-contained file.
-FROM node:20-alpine AS builder
+# Stage 1: Concatenate namespace files into a single bundle.
+#
+# Keto's OPL engine cannot resolve cross-file imports, and it also requires
+# class declarations (not transpiled class expressions). esbuild is therefore
+# not suitable here — it both strips TypeScript types (which carry Keto's
+# relation schema) and converts `class Foo {}` to `var Foo = class {}`.
+#
+# Instead, build-namespaces.mjs inlines every file in dependency order,
+# removing only import/export statements while leaving all type annotations
+# intact.  No npm packages are needed — pure Node.js built-ins only.
+FROM node:22-alpine AS builder
 WORKDIR /build
-RUN npm install @ory/keto-namespace-types esbuild
-COPY namespaces/ .
-RUN npx esbuild index.ts \
-    --bundle \
-    --format=esm \
-    --outfile=bundle.ts
+COPY namespaces/ ./namespaces/
+COPY build-namespaces.mjs .
+RUN node build-namespaces.mjs
 
 # Stage 2: Final Keto image — only the bundle is needed.
 FROM oryd/keto:v25.4.0
